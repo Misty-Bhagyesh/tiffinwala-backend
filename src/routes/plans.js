@@ -1,13 +1,44 @@
 const express = require('express');
+const Plan = require('../models/Plan');
+const protect = require('../middleware/auth');
+const adminOnly = require('../middleware/adminOnly');
+
 const router = express.Router();
 
-const PLANS = [
-  { id: 'today',    label: 'Today Only',    sub: 'Single delivery today',   emoji: '📅', needsDates: false, codAllowed: true },
-  { id: 'tomorrow', label: 'Tomorrow',      sub: 'Scheduled for tomorrow',  emoji: '📆', needsDates: false, codAllowed: true },
-  { id: 'weekly',   label: 'Weekly Plan',   sub: '7 days · Best value',     emoji: '📋', needsDates: true,  codAllowed: false },
-  { id: 'monthly',  label: 'Monthly Plan',  sub: '30 days · Save more',     emoji: '📦', needsDates: true,  codAllowed: false },
-];
+router.get('/', async (req, res) => {
+  try {
+    const plans = await Plan.find({ isActive: true }).sort({ totalPrice: 1 });
+    res.json({ plans });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
-router.get('/', (req, res) => res.json({ plans: PLANS }));
+router.post('/', protect, adminOnly, async (req, res) => {
+  try {
+    const plan = await Plan.create(req.body);
+    res.status(201).json({ plan });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.patch('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const plan = await Plan.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ plan });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    await Plan.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Plan deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 module.exports = router;

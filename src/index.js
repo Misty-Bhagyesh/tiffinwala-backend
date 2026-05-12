@@ -1,67 +1,54 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const mongoose = require('mongoose');
-const path = require('path');
-const fs = require('fs');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// ── Ensure uploads directory exists ──────────────────────────
-const uploadDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-// ── Middleware ────────────────────────────────────────────────
-app.use(cors({ origin: '*', credentials: true }));
+// Middleware
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Serve uploaded files (payment screenshots, etc.)
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Routes
+const authRoutes = require('./routes/auth');
+const mealsRoutes = require('./routes/meals');
+const ordersRoutes = require('./routes/orders');
+const plansRoutes = require('./routes/plans');
+const adminRoutes = require('./routes/admin');
 
-// ── Health check ──────────────────────────────────────────────
-app.get('/health', (req, res) =>
-  res.json({ status: 'ok', time: new Date().toISOString() })
-);
+app.use('/api/auth', authRoutes);
+app.use('/api/meals', mealsRoutes);
+app.use('/api/orders', ordersRoutes);
+app.use('/api/plans', plansRoutes);
+app.use('/api/admin', adminRoutes);
 
-// ── API Routes ────────────────────────────────────────────────
-app.use('/api/auth',   require('./routes/auth'));
-app.use('/api/meals',  require('./routes/meals'));
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/plans',  require('./routes/plans'));
-app.use('/api/admin',  require('./routes/admin'));
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ message: `Route ${req.originalUrl} not found.` });
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Global error handler (must be last)
-app.use(require('./middleware/errorHandler'));
-
-// ── Database & Server Start ───────────────────────────────────
+// Connect DB
 mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tiffinwala')
+  .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
+    
+    // Start server
+    const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
-      console.log(`🚀 TiffinWala API running on http://localhost:${PORT}`);
-      console.log(`📋 Routes:`);
-      console.log(`   POST /api/auth/register`);
-      console.log(`   POST /api/auth/login`);
-      console.log(`   GET  /api/meals`);
-      console.log(`   GET  /api/meals/addons`);
-      console.log(`   POST /api/orders`);
-      console.log(`   GET  /api/orders/my`);
-      console.log(`   POST /api/orders/:id/payment`);
-      console.log(`   GET  /api/admin/stats`);
-      console.log(`   GET  /api/admin/orders/pending`);
+      console.log(`✅ Server running on port ${PORT}`);
+      console.log('📋 Routes:');
+      console.log('   POST /api/auth/register');
+      console.log('   POST /api/auth/login');
+      console.log('   GET  /api/meals');
+      console.log('   GET  /api/plans');
+      console.log('   POST /api/orders');
+      console.log('   GET  /api/orders/my');
+      console.log('   GET  /api/admin/stats');
     });
   })
-  .catch((err) => {
+  .catch(err => {
     console.error('❌ MongoDB connection failed:', err.message);
     process.exit(1);
   });
-
-module.exports = app;
